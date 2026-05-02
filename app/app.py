@@ -1,5 +1,10 @@
-import json
+import sys
 from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT_DIR))
+
+import json
 
 import pandas as pd
 import plotly.graph_objects as go
