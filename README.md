@@ -8,7 +8,7 @@ This project predicts the **95% price range for BTCUSDT one hour ahead** using B
 
 ## Live Dashboard
 
-Dashboard URL: _to be added after deployment_
+Dashboard URL: [Live Demo](https://btc-forecast-alphai.streamlit.app/)
 
 ---
 
