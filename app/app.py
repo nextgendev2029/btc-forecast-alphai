@@ -14,7 +14,7 @@ from src.data import fetch_binance_klines, get_close_prices, validate_hourly_dat
 from src.model import predict_next_range
 
 from supabase import create_client
-import datetime
+from datetime import datetime, timezone
 
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -123,16 +123,12 @@ low_95, high_95 = predict_next_range(
     seed=42,
 )
 
-prediction_time = prices.index[-1].isoformat()
-target_time = (prices.index[-1] + pd.Timedelta(hours=1)).isoformat()
 
-# Check if already exists
-existing = supabase.table("prediction_history") \
-    .select("id") \
-    .eq("target_time", target_time) \
-    .execute()
+prediction_time = datetime.now(timezone.utc).isoformat()
+target_time = (prices.index[-1] + pd.Timedelta(hours=1)).floor("h").isoformat()
 
-if not existing.data:
+if "last_saved_target" not in st.session_state or st.session_state["last_saved_target"] != target_time:
+
     supabase.table("prediction_history").insert({
         "prediction_time": prediction_time,
         "target_time": target_time,
@@ -141,6 +137,8 @@ if not existing.data:
         "high_95": high_95,
         "range_width": high_95 - low_95,
     }).execute()
+
+    st.session_state["last_saved_target"] = target_time
 
 # Update actual prices for past predictions
 full_df = fetch_binance_klines(limit=1500)
@@ -163,20 +161,6 @@ for row in history.data:
                 .execute()
         except Exception as e:
             print("Update error:", e)
-
-st.subheader("Prediction History")
-
-history = supabase.table("prediction_history") \
-    .select("*") \
-    .order("prediction_time", desc=True) \
-    .limit(50) \
-    .execute()
-
-if history.data:
-    df_hist = pd.DataFrame(history.data)
-    st.dataframe(df_hist.sort_values("prediction_time", ascending=False))
-else:
-    st.info("No predictions yet")
 
 
 metrics = load_backtest_metrics()
@@ -216,3 +200,17 @@ with st.expander("Model details"):
         - Backtest: no-peeking rolling evaluation
         """
     )
+
+st.subheader("Prediction History")
+
+history = supabase.table("prediction_history") \
+    .select("*") \
+    .order("prediction_time", desc=True) \
+    .limit(50) \
+    .execute()
+
+if history.data:
+    df_hist = pd.DataFrame(history.data)
+    st.dataframe(df_hist.sort_values("prediction_time", ascending=False))
+else:
+    st.info("No predictions yet")
