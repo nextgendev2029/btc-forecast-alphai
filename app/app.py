@@ -13,6 +13,13 @@ import streamlit as st
 from src.data import fetch_binance_klines, get_close_prices, validate_hourly_data
 from src.model import predict_next_range
 
+from supabase import create_client
+import datetime
+
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(
     page_title="BTC Next-Hour Forecast",
@@ -115,6 +122,62 @@ low_95, high_95 = predict_next_range(
     range_scale=1.05,
     seed=42,
 )
+
+prediction_time = prices.index[-1].isoformat()
+target_time = (prices.index[-1] + pd.Timedelta(hours=1)).isoformat()
+
+# Check if already exists
+existing = supabase.table("prediction_history") \
+    .select("id") \
+    .eq("target_time", target_time) \
+    .execute()
+
+if not existing.data:
+    supabase.table("prediction_history").insert({
+        "prediction_time": prediction_time,
+        "target_time": target_time,
+        "current_price": current_price,
+        "low_95": low_95,
+        "high_95": high_95,
+        "range_width": high_95 - low_95,
+    }).execute()
+
+# Update actual prices for past predictions
+full_df = fetch_binance_klines(limit=1500)
+full_prices = get_close_prices(full_df)
+
+history = supabase.table("prediction_history").select("*").execute()
+
+for row in history.data:
+    if row["actual_price"] is None:
+        try:
+            actual_price = full_prices.loc[pd.to_datetime(row["target_time"])]
+            covered = row["low_95"] <= actual_price <= row["high_95"]
+
+            supabase.table("prediction_history") \
+                .update({
+                    "actual_price": float(actual_price),
+                    "covered_95": covered
+                }) \
+                .eq("id", row["id"]) \
+                .execute()
+        except Exception as e:
+            print("Update error:", e)
+
+st.subheader("Prediction History")
+
+history = supabase.table("prediction_history") \
+    .select("*") \
+    .order("prediction_time", desc=True) \
+    .limit(50) \
+    .execute()
+
+if history.data:
+    df_hist = pd.DataFrame(history.data)
+    st.dataframe(df_hist.sort_values("prediction_time", ascending=False))
+else:
+    st.info("No predictions yet")
+
 
 metrics = load_backtest_metrics()
 
