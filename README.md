@@ -10,6 +10,12 @@ This project predicts the **95% price range for BTCUSDT one hour ahead** using B
 
 Dashboard URL: [Live Demo](https://btc-forecast-alphai.streamlit.app/)
 
+## Notebook
+
+Colab Notebook: [Open in Google Colab](https://colab.research.google.com/drive/1lvePG9txgpxg8PHoEpyXqiqh-qDEvvoM?usp=sharing)
+
+Repository Notebook: [`notebook/BTC_Forecast_AlphaI_Final.ipynb`](notebook/BTC_Forecast_AlphaI_Final.ipynb)
+
 ---
 
 ## Repository Structure
