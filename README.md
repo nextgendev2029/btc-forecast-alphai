@@ -81,8 +81,8 @@ This ensures no future data leakage.
 ### Backtest Results (720 Predictions)
 ```text
 coverage_95      = 0.9486
-average_width_95 = 1195.41
-mean_winkler_95  = 1774.43
+average_width_95 = 1175.12
+mean_winkler_95  = 1719.38
 n_predictions    = 720
 ```
 
@@ -101,6 +101,8 @@ Grid search was performed over:
 - minimize Winkler score
 
 Results saved in: `outputs/tuning_results.csv`
+
+The final dashboard/backtest uses `range_scale=1.05` instead of the 300-bar tuning winner `1.03` because it produced more robust 720-bar coverage closer to the 0.95 target, with almost unchanged Winkler.
 
 ## How to Run
 
@@ -127,6 +129,25 @@ streamlit run app/app.py
 - Range width
 - Backtest metrics
 - Last 50 candles + forecast ribbon
+
+## Prediction Persistence (Part C Bonus)
+
+The live dashboard uses Supabase to persist predictions.
+
+Every new dashboard visit saves the current prediction with:
+
+- prediction time
+- target time
+- current BTC price
+- predicted 95% low/high range
+- range width
+
+When the target candle closes, the dashboard backfills:
+
+- actual BTC close price
+- whether the prediction was covered
+
+The dashboard displays the full prediction history so the timeline grows over time.
 
 ## Files for Review
 - **Notebook:** `notebook/BTC_Forecast_AlphaI_Final.ipynb`

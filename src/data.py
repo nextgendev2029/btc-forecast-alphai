@@ -61,8 +61,11 @@ def fetch_binance_klines(
     Binance gives limited rows per request, so this function paginates backward
     until we collect the requested number of bars.
     """
+
+    requested_limit = limit
+
     all_raw = []
-    remaining = limit
+    remaining = limit + 1
     end_time = None
 
     while remaining > 0:
@@ -99,9 +102,14 @@ def fetch_binance_klines(
 
     df = _raw_klines_to_df(all_raw)
 
+    # Keep only fully closed candles.
+    # Binance can include the currently-forming candle; assignment requires latest closed bar.
+    now_utc = pd.Timestamp.now(tz="UTC")
+    df = df[df["close_time"] <= now_utc].copy()
+
     df = df.drop_duplicates(subset=["open_time"])
     df = df.sort_values("open_time").reset_index(drop=True)
-    df = df.tail(limit).reset_index(drop=True)
+    df = df.tail(requested_limit).reset_index(drop=True)
 
     return df
 

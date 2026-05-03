@@ -140,27 +140,32 @@ if "last_saved_target" not in st.session_state or st.session_state["last_saved_t
 
     st.session_state["last_saved_target"] = target_time
 
-# Update actual prices for past predictions
+# Update actual prices for past predictions.
+# Normalize Binance close_time to hourly buckets so:
+# 19:00:00 and 19:59:59.999 match the same target hour.
 full_df = fetch_binance_klines(limit=1500)
 full_prices = get_close_prices(full_df)
+
+full_prices_by_hour = full_prices.copy()
+full_prices_by_hour.index = full_prices_by_hour.index.floor("h")
 
 history = supabase.table("prediction_history").select("*").execute()
 
 for row in history.data:
     if row["actual_price"] is None:
-        try:
-            actual_price = full_prices.loc[pd.to_datetime(row["target_time"])]
-            covered = row["low_95"] <= actual_price <= row["high_95"]
+        target_hour = pd.to_datetime(row["target_time"]).floor("h")
+
+        if target_hour in full_prices_by_hour.index:
+            actual_price = float(full_prices_by_hour.loc[target_hour])
+            covered = bool(row["low_95"] <= actual_price <= row["high_95"])
 
             supabase.table("prediction_history") \
                 .update({
-                    "actual_price": float(actual_price),
-                    "covered_95": covered
+                    "actual_price": actual_price,
+                    "covered_95": covered,
                 }) \
                 .eq("id", row["id"]) \
                 .execute()
-        except Exception as e:
-            print("Update error:", e)
 
 
 metrics = load_backtest_metrics()
@@ -206,7 +211,6 @@ st.subheader("Prediction History")
 history = supabase.table("prediction_history") \
     .select("*") \
     .order("prediction_time", desc=True) \
-    .limit(50) \
     .execute()
 
 if history.data:
